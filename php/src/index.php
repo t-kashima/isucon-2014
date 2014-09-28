@@ -2,6 +2,9 @@
 require_once 'limonade/lib/limonade.php';
 
 function configure() {
+  /*解析スタート*/
+  xhprof_enable();
+
   option('base_uri', '/');
   option('session', 'isu4_qualifier_session');
 
@@ -215,6 +218,8 @@ function locked_users() {
 }
 
 dispatch_get('/', function() {
+    /* var_dump(getallheaders()); */
+    /* var_dump($_SERVER); */
   return html('index.html.php');
 });
 
@@ -242,6 +247,7 @@ dispatch_post('/login', function() {
 });
 
 dispatch_get('/mypage', function() {
+
   $user = current_user();
 
   if (empty($user)) {
@@ -261,5 +267,26 @@ dispatch_get('/report', function() {
     'locked_users' => locked_users()
   ]);
 });
+
+
+function after($output) {
+
+xhprof_enable();
+// プロファイリングの終了
+$xhprof_data = xhprof_disable();
+
+$XHPROF_ROOT = '/home/isucon/webapp/php/src';
+include_once $XHPROF_ROOT . "/xhprof_lib/utils/xhprof_lib.php";
+include_once $XHPROF_ROOT . "/xhprof_lib/utils/xhprof_runs.php";
+
+$xhprof_runs = new XHProfRuns_Default();
+$paramator = 'xhprof';
+$run_id = $xhprof_runs->save_run($xhprof_data, $paramator);
+
+// URLを生成してリンクを作成
+echo "<a href=\"/xhprof/index.php?run=$run_id&source=$paramator\" target='_blank'>プロファイリング結果やで</a>";
+
+return $output;
+}
 
 run();
