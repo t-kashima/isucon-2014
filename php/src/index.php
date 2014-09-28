@@ -1,14 +1,21 @@
 <?php
 require_once 'limonade/lib/limonade.php';
 
+/* $m = new Memcache(); */
+
 function configure() {
-
-  /*memacaheテスト*/
-  //$m = new Memcache();
-  //$m['dsn'];
-
+  $m = new Memcache();
+  $m->addServer('localhost', 11211);
+  option('m', $m);
+  /* print_r($GLOBALS); */
+  /* exit(); */
+/* $user_id = 'a'; */
+/*   $set = option('m')->set($user_id, 'nogeoge', 0, 600); */
+/*   var_dump($set); */
+/*   $hoge = option('m')->get($user_id); */
+/* var_dump($hoge); */
   /*解析スタート*/
-  xhprof_enable();
+  //xhprof_enable();
 
   option('base_uri', '/');
   option('session', 'isu4_qualifier_session');
@@ -62,7 +69,10 @@ function calculate_password_hash($password, $salt) {
 function login_log($succeeded, $login, $user_id=null) {
   $db = option('db_conn');
 
-  $stmt = $db->prepare('INSERT INTO login_log (`created_at`, `user_id`, `login`, `ip`, `succeeded`) VALUES (NOW(),:user_id,:login,:ip,:succeeded)');
+  $date = date('Y-m-d H:i:s');
+  $stmt = $db->prepare('INSERT INTO login_log (`created_at`, `user_id`, `login`, `ip`, `succeeded`) VALUES (:date,:user_id,:login,:ip,:succeeded)');
+  /* $stmt = $db->prepare('INSERT INTO login_log (`user_id`, `login`, `ip`, `succeeded`) VALUES (:user_id,:login,:ip,:succeeded)'); */
+  $stmt->bindValue(':date', $date);
   $stmt->bindValue(':user_id', $user_id);
   $stmt->bindValue(':login', $login);
   $stmt->bindValue(':ip', $_SERVER['REMOTE_ADDR']);
@@ -73,26 +83,45 @@ function login_log($succeeded, $login, $user_id=null) {
 function user_locked($user) {
   if (empty($user)) { return null; }
 
+  $user_id = $user['id'];
+  if (option('m')->get($user_id)) {
+    return true;
+  }
+
   $db = option('db_conn');
   $stmt = $db->prepare('SELECT COUNT(id) AS failures FROM login_log WHERE user_id = :user_id AND id > IFNULL((select id from login_log where user_id = :user_id AND succeeded = 1 ORDER BY id DESC LIMIT 1), 0)');
-  $stmt->bindValue(':user_id', $user['id']);
+  $stmt->bindValue(':user_id', $user_id);
   $stmt->execute();
   $log = $stmt->fetch(PDO::FETCH_ASSOC);
 
   $config = option('config');
-  return $config['user_lock_threshold'] <= $log['failures'];
+  $is_locked = $config['user_lock_threshold'] <= $log['failures'];
+  if ($is_locked) {
+    option('m')->set($user_id, true, 0, 600);
+  }
+  return $is_locked;
 }
 
 # FIXME
 function ip_banned() {
+  $ip = $_SERVER['REMOTE_ADDR'];
+  
+  if (option('m')->get($ip)) {
+    return true;
+  }
+
   $db = option('db_conn');
   $stmt = $db->prepare('SELECT COUNT(id) AS failures FROM login_log WHERE ip = :ip AND id > IFNULL((select id from login_log where ip = :ip AND succeeded = 1 ORDER BY id DESC LIMIT 1), 0)');
-  $stmt->bindValue(':ip', $_SERVER['REMOTE_ADDR']);
+  $stmt->bindValue(':ip', $ip);
   $stmt->execute();
   $log = $stmt->fetch(PDO::FETCH_ASSOC);
 
   $config = option('config');
-  return $config['ip_ban_threshold'] <= $log['failures'];
+  $is_banned = $config['ip_ban_threshold'] <= $log['failures'];
+  if ($is_banned) {
+    option('m')->set($ip, true, 0, 600);
+  }
+  return $is_banned;
 }
 
 function attempt_login($login, $password) {
@@ -231,7 +260,7 @@ dispatch_get('/', function() {
 dispatch_post('/login', function() {
   $result = attempt_login($_POST['login'], $_POST['password']);
   if (!empty($result['user'])) {
-    session_regenerate_id(true);
+    /* session_regenerate_id(true); */
     $_SESSION['user_id'] = $result['user']['id'];
     return redirect_to('/mypage');
   }
@@ -276,6 +305,7 @@ dispatch_get('/report', function() {
 
 function after($output) {
 
+/*
 xhprof_enable();
 // プロファイリングの終了
 $xhprof_data = xhprof_disable();
@@ -287,9 +317,9 @@ include_once $XHPROF_ROOT . "/xhprof_lib/utils/xhprof_runs.php";
 $xhprof_runs = new XHProfRuns_Default();
 $paramator = 'xhprof';
 $run_id = $xhprof_runs->save_run($xhprof_data, $paramator);
-
+*/
 // URLを生成してリンクを作成
-echo "<a href=\"/xhprof/index.php?run=$run_id&source=$paramator\" target='_blank'>プロファイリング結果やで</a>";
+//echo "<a href=\"/xhprof/index.php?run=$run_id&source=$paramator\" target='_blank'>プロファイリング結果やで</a>";
 
 return $output;
 }
