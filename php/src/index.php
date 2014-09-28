@@ -2,6 +2,11 @@
 require_once 'limonade/lib/limonade.php';
 
 function configure() {
+
+  /*memacaheテスト*/
+  //$m = new Memcache();
+  //$m['dsn'];
+
   /*解析スタート*/
   xhprof_enable();
 
@@ -69,7 +74,7 @@ function user_locked($user) {
   if (empty($user)) { return null; }
 
   $db = option('db_conn');
-  $stmt = $db->prepare('SELECT COUNT(1) AS failures FROM login_log WHERE user_id = :user_id AND id > IFNULL((select id from login_log where user_id = :user_id AND succeeded = 1 ORDER BY id DESC LIMIT 1), 0)');
+  $stmt = $db->prepare('SELECT COUNT(id) AS failures FROM login_log WHERE user_id = :user_id AND id > IFNULL((select id from login_log where user_id = :user_id AND succeeded = 1 ORDER BY id DESC LIMIT 1), 0)');
   $stmt->bindValue(':user_id', $user['id']);
   $stmt->execute();
   $log = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -81,7 +86,7 @@ function user_locked($user) {
 # FIXME
 function ip_banned() {
   $db = option('db_conn');
-  $stmt = $db->prepare('SELECT COUNT(1) AS failures FROM login_log WHERE ip = :ip AND id > IFNULL((select id from login_log where ip = :ip AND succeeded = 1 ORDER BY id DESC LIMIT 1), 0)');
+  $stmt = $db->prepare('SELECT COUNT(id) AS failures FROM login_log WHERE ip = :ip AND id > IFNULL((select id from login_log where ip = :ip AND succeeded = 1 ORDER BY id DESC LIMIT 1), 0)');
   $stmt->bindValue(':ip', $_SERVER['REMOTE_ADDR']);
   $stmt->execute();
   $log = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -93,7 +98,7 @@ function ip_banned() {
 function attempt_login($login, $password) {
   $db = option('db_conn');
 
-  $stmt = $db->prepare('SELECT * FROM users WHERE login = :login');
+  $stmt = $db->prepare('SELECT id, password_hash, salt FROM users WHERE login = :login');
   $stmt->bindValue(':login', $login);
   $stmt->execute();
   $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -129,7 +134,7 @@ function current_user() {
 
   $db = option('db_conn');
 
-  $stmt = $db->prepare('SELECT * FROM users WHERE id = :id');
+  $stmt = $db->prepare('SELECT id, login FROM users WHERE id = :id');
   $stmt->bindValue(':id', $_SESSION['user_id']);
   $stmt->execute();
   $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -150,7 +155,7 @@ function last_login() {
 
   $db = option('db_conn');
 
-  $stmt = $db->prepare('SELECT * FROM login_log WHERE succeeded = 1 AND user_id = :id ORDER BY id DESC LIMIT 2');
+  $stmt = $db->prepare('SELECT ip, created_at FROM login_log WHERE succeeded = 1 AND user_id = :id ORDER BY id DESC LIMIT 2');
   $stmt->bindValue(':id', $user['id']);
   $stmt->execute();
   $stmt->fetch();
@@ -163,7 +168,7 @@ function banned_ips() {
 
   $db = option('db_conn');
 
-  $stmt = $db->prepare('SELECT ip FROM (SELECT ip, MAX(succeeded) as max_succeeded, COUNT(1) as cnt FROM login_log GROUP BY ip) AS t0 WHERE t0.max_succeeded = 0 AND t0.cnt >= :threshold');
+  $stmt = $db->prepare('SELECT ip FROM (SELECT ip, MAX(succeeded) as max_succeeded, COUNT(id) as cnt FROM login_log GROUP BY ip) AS t0 WHERE t0.max_succeeded = 0 AND t0.cnt >= :threshold');
   $stmt->bindValue(':threshold', $threshold);
   $stmt->execute();
   $not_succeeded = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
@@ -174,7 +179,7 @@ function banned_ips() {
   $last_succeeds = $stmt->fetchAll();
 
   foreach ($last_succeeds as $row) {
-    $stmt = $db->prepare('SELECT COUNT(1) AS cnt FROM login_log WHERE ip = :ip AND :id < id');
+    $stmt = $db->prepare('SELECT COUNT(id) AS cnt FROM login_log WHERE ip = :ip AND :id < id');
     $stmt->bindValue(':ip', $row['ip']);
     $stmt->bindValue(':id', $row['last_login_id']);
     $stmt->execute();
@@ -193,7 +198,7 @@ function locked_users() {
 
   $db = option('db_conn');
 
-  $stmt = $db->prepare('SELECT login FROM (SELECT user_id, login, MAX(succeeded) as max_succeeded, COUNT(1) as cnt FROM login_log GROUP BY user_id) AS t0 WHERE t0.user_id IS NOT NULL AND t0.max_succeeded = 0 AND t0.cnt >= :threshold');
+  $stmt = $db->prepare('SELECT login FROM (SELECT user_id, login, MAX(succeeded) as max_succeeded, COUNT(id) as cnt FROM login_log GROUP BY user_id) AS t0 WHERE t0.user_id IS NOT NULL AND t0.max_succeeded = 0 AND t0.cnt >= :threshold');
   $stmt->bindValue(':threshold', $threshold);
   $stmt->execute();
   $not_succeeded = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
@@ -204,7 +209,7 @@ function locked_users() {
   $last_succeeds = $stmt->fetchAll();
 
   foreach ($last_succeeds as $row) {
-    $stmt = $db->prepare('SELECT COUNT(1) AS cnt FROM login_log WHERE user_id = :user_id AND :id < id');
+    $stmt = $db->prepare('SELECT COUNT(id) AS cnt FROM login_log WHERE user_id = :user_id AND :id < id');
     $stmt->bindValue(':user_id', $row['user_id']);
     $stmt->bindValue(':id', $row['last_login_id']);
     $stmt->execute();
