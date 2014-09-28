@@ -8,3 +8,9 @@ ISUCON 2014
 ```
 $ ./benchmarker bench --api-key 87-2-ncfwse-40rp-a21ade5ac9385add3c84f6e907298d15c1ba14e5
 ```
+
+## データベースへの接続
+
+```
+$ ./mysql -u isucon -pisucon isu4_qualifier
+```
