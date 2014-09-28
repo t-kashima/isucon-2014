@@ -18,7 +18,7 @@ $ ./mysql -u isucon -pisucon isu4_qualifier
 
 ## PHP側の改修場所
 
-### *
+### アスタリスク
 
 ```
 93行目:  $stmt = $db->prepare('SELECT * FROM users WHERE login = :login');
