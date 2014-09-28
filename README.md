@@ -12,8 +12,11 @@ $ ./benchmarker bench --api-key 87-2-ncfwse-40rp-a21ade5ac9385add3c84f6e907298d1
 ## データベースへの接続
 
 ```
-$ ./mysql -u isucon -pisucon isu4_qualifier
+$ mysql -u isucon -pisucon isu4_qualifier
 ```
+
+### url
+ec2-54-64-210-62.ap-northeast-1.compute.amazonaws.com
 
 
 ## PHP側の改修場所
